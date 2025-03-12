@@ -73,6 +73,43 @@ def generate_delaware_articles(company_data: CompanyFormation) -> BytesIO:
     buffer.seek(0)
     return buffer
 
+def generate_delaware_llc_certificate(company_data: CompanyFormation) -> BytesIO:
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Set up the document
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(300, 750, "CERTIFICATE OF FORMATION")
+    c.setFont("Helvetica", 12)
+    
+    # Article First - Company Name
+    c.drawString(50, 700, "FIRST: The name of the limited liability company is:")
+    c.drawString(70, 680, company_data.company_name)
+    
+    # Article Second - Registered Office
+    c.drawString(50, 630, "SECOND: The address of its registered office in the State of Delaware is:")
+    c.drawString(70, 610, "251 Little Falls Drive, Wilmington, New Castle County, Delaware 19808")
+    
+    # Article Third - Registered Agent
+    c.drawString(50, 560, "THIRD: The name and address of its registered agent in the State of Delaware is:")
+    c.drawString(70, 540, "Corporation Service Company")
+    c.drawString(70, 520, "251 Little Falls Drive")
+    c.drawString(70, 500, "Wilmington, DE 19808")
+    
+    # Article Fourth - Management
+    c.drawString(50, 450, "FOURTH: The limited liability company shall be managed by its members.")
+    
+    # Execution
+    c.drawString(50, 200, f"IN WITNESS WHEREOF, the undersigned has executed this Certificate of Formation this {datetime.now().strftime('%d')} day of")
+    c.drawString(50, 180, f"{datetime.now().strftime('%B, %Y')}.")
+    
+    c.drawString(50, 100, "Authorized Person:")
+    c.drawString(70, 80, company_data.incorporator_name)
+    
+    c.save()
+    buffer.seek(0)
+    return buffer
+
 @app.route('/form-company', methods=['POST'])
 def form_company():
     try:
@@ -89,18 +126,24 @@ def form_company():
         
         company_data = CompanyFormation(**data)
         
-        if company_data.state_of_formation == 'DE' and company_data.company_type == 'corporation':
-            pdf_buffer = generate_delaware_articles(company_data)
+        if company_data.state_of_formation == 'DE':
+            if company_data.company_type == 'corporation':
+                pdf_buffer = generate_delaware_articles(company_data)
+            elif company_data.company_type == 'LLC':
+                pdf_buffer = generate_delaware_llc_certificate(company_data)
+            else:
+                return jsonify({"error": "Unsupported company type"}), 400
+    
             return send_file(
                 pdf_buffer,
                 mimetype='application/pdf',
                 as_attachment=True,
-                download_name=f"{company_data.company_name}_articles.pdf"
+                download_name=f"{company_data.company_name}_certificate.pdf"
             )
         else:
             return jsonify({
-                "error": "Only Delaware corporations are supported at this time"
-            }), 400
+                "error": "Only Delaware entities are supported at this time"
+            }), 400    
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
